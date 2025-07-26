@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sanskar Public School - Attendance App</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-color: #005A9C; --secondary-color: #0D9488; --dark-color: #374151;
+            --background-color: #f4f7fa; --card-color: #ffffff; --text-color: #333333;
+            --light-gray-color: #e2e8f0; --success-color: #22c55e; --error-color: #ef4444;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Poppins', sans-serif; background-color: var(--background-color); color: var(--text-color);
+            display: flex; justify-content: center; align-items: center; min-height: 100vh;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .app-container {
+            width: 100%; max-width: 480px; height: 100vh; background-color: var(--card-color);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); position: relative; overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+        .screen { display: none; flex-direction: column; width: 100%; height: 100%; flex-grow: 1; }
+        .screen.active { display: flex; }
+
+        .app-header, .scanner-header {
+            color: white; padding: 20px; text-align: center; width: 100%; box-sizing: border-box;
+        }
+        .app-header h1, .scanner-header h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
+        .app-header p, .scanner-header p { font-size: 0.9rem; margin-top: 5px; opacity: 0.9; }
+        .app-header { background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); }
+        .scanner-header { background: rgba(0,0,0,0.6); position: absolute; top: 0; z-index: 2; }
+        
+        #login-screen { justify-content: center; }
+        .login-content { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; padding: 25px; }
+        .login-header { text-align: center; margin-bottom: 40px; }
+        .login-header h2 { font-size: 2rem; font-weight: 700; color: var(--primary-color); }
+        .login-header p { color: #666; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 500; }
+        .form-group input { width: 100%; padding: 15px; border: 1px solid var(--light-gray-color); border-radius: 12px; font-size: 1rem; }
+        .btn { width: 100%; padding: 16px; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: background-color .3s ease; }
+        .btn-primary { background-color: var(--primary-color); color: white; }
+        .btn-dark { background-color: var(--dark-color); color: white; }
+        
+        #scanner-screen { background-color: #000; justify-content: center; align-items: center; position: relative; color: #fff; }
+        #qr-reader { width: 100%; background-color: #000; overflow: hidden; }
+        #qr-reader__scan_region { border-radius: 24px !important; border: 3px solid hsla(0,0%,100%,.8) !important; }
+        .scanner-footer { position: absolute; bottom: 20px; z-index: 2; display: flex; gap: 10px; padding: 0 20px; width: 100%; }
+        .scanner-footer .btn { padding: 12px 20px; font-size: .9rem; width: 100%; }
+        
+        .dashboard-content { padding: 25px; flex-grow: 1; overflow-y: auto; padding-bottom: 80px; }
+        .dashboard-page-content { display: none; }
+        .dashboard-page-content.active { display: block; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Screens -->
+        <div id="login-screen" class="screen active">
+             <div class="app-header"><h1>Sanskar Public School</h1><p>Attendance System</p></div>
+            <div class="login-content">
+                <div class="login-header"><h2>Welcome!</h2><p>Please log in or start scanner</p></div>
+                <button onclick="showScreen('scanner-screen')" class="btn btn-dark">Start Scanner</button>
+            </div>
+        </div>
+        <div id="scanner-screen" class="screen">
+            <div class="scanner-header"><h1>Scan QR Code</h1><p>Align the code within the frame</p></div>
+            <div id="qr-reader"></div>
+            <div class="scanner-footer">
+                <button id="switch-camera-btn" class="btn btn-dark">Switch Camera</button>
+                <button class="btn btn-dark" onclick="stopAndExitScanner()">Exit Scanner</button>
+            </div>
+        </div>
+        <!-- Other screens like dashboard can be added here -->
+    </div>
+
+    <!-- 1. QR Scanner Library -->
+    <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
+
+    <!-- 2. Firebase v9 Compatibility Libraries -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore-compat.js"></script>
+    
+    <!-- 3. Your Firebase Configuration -->
+    <script>
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCAwDL2AjjGuVaWzPT1HndtaDBBVYpf45w",
+            authDomain: "spsattendance-6e2e6.firebaseapp.com",
+            projectId: "spsattendance-6e2e6",
+            storageBucket: "spsattendance-6e2e6.appspot.com",
+            messagingSenderId: "777825050061",
+            appId: "1:777825050061:web:b655d139f8a2f3649df884"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore(); // Get a reference to the Firestore database
+    </script>
+
+    <!-- 4. Main Application Logic -->
+    <script>
+        let html5QrCode = null;
+        let cameras = [];
+        let currentCameraIndex = 0;
+
+        // UPDATED: This function now sends data to Firestore
+        async function onScanSuccess(decodedText, decodedResult) {
+            if (html5QrCode.isScanning) {
+                await stopScanner();
+                
+                try {
+                    // Add a new document with a generated ID to the "attendance" collection
+                    const docRef = await db.collection("attendance").add({
+                        scanned_id: decodedText,      // The data from the QR code (e.g., student ID)
+                        timestamp: new Date()         // The current time of the scan
+                    });
+                    
+                    console.log("Document written with ID: ", docRef.id);
+                    alert(`Attendance Marked Successfully!\nData: ${decodedText}`);
+
+                } catch (error) {
+                    console.error("Error adding document: ", error);
+                    alert("Failed to mark attendance. Please check internet and try again.");
+                }
+
+                // Go back to the login screen after processing
+                showScreen('login-screen');
+            }
+        }
+        
+        function onScanFailure(error) { /* Ignore */ }
+        
+        async function startScanner() {
+            if (!html5QrCode) {
+                html5QrCode = new Html5Qrcode("qr-reader");
+            }
+            
+            if (html5QrCode.isScanning) return;
+
+            try {
+                cameras = await Html5Qrcode.getCameras();
+                if (cameras && cameras.length) {
+                    let startingCameraId = cameras[0].id;
+                    const rearCamera = cameras.find(c => c.label.toLowerCase().includes('back'));
+                    if (rearCamera) {
+                        startingCameraId = rearCamera.id;
+                    }
+                    currentCameraIndex = cameras.findIndex(c => c.id === startingCameraId);
+                    
+                    await html5QrCode.start(
+                        startingCameraId, 
+                        { fps: 10, qrbox: { width: 250, height: 250 } },
+                        onScanSuccess,
+                        onScanFailure
+                    );
+                }
+            } catch (err) {
+                alert("Could not start camera. Please grant camera permission.");
+            }
+        }
+        
+        async function stopScanner() {
+            try {
+                if (html5QrCode && html5QrCode.isScanning) {
+                    await html5QrCode.stop();
+                }
+            } catch (err) {
+                console.log("Scanner stopped.");
+            }
+        }
+
+        async function stopAndExitScanner() {
+            await stopScanner();
+            showScreen('login-screen');
+        }
+        
+        document.getElementById('switch-camera-btn').addEventListener('click', async () => {
+            if (cameras && cameras.length > 1) {
+                await stopScanner();
+                currentCameraIndex = (currentCameraIndex + 1) % cameras.length;
+                const nextCameraId = cameras[currentCameraIndex].id;
+                await html5QrCode.start(
+                    nextCameraId, { fps: 10, qrbox: { width: 250, height: 250 } },
+                    onScanSuccess, onScanFailure
+                );
+            }
+        });
+
+       async function showScreen(screenId) {
+            const currentScreen = document.querySelector('.screen.active');
+            if (currentScreen && currentScreen.id === 'scanner-screen' && screenId !== 'scanner-screen') {
+                await stopScanner();
+            }
+
+            document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            
+            if (screenId === 'scanner-screen') {
+                setTimeout(startScanner, 150);
+            }
+        }
+    </script>
+</body>
+</html>
